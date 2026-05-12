@@ -4,6 +4,62 @@ Dashboard agrícola de monitoreo en tiempo real de temperatura, humedad del suel
 
 ---
 
+## 📋 Requisitos previos
+
+Antes de clonar y ejecutar este proyecto asegúrate de tener instalado:
+
+| Herramienta | Versión mínima | Enlace |
+|-------------|---------------|--------|
+| Flutter SDK | >= 3.10.0 | https://docs.flutter.dev/get-started/install |
+| Dart SDK | >= 3.0.0 | (incluido con Flutter) |
+| Git | cualquier versión reciente | https://git-scm.com |
+
+> **Nota:** Verifica tu instalación con `flutter doctor`. Todos los checks deben estar en verde (o solo con advertencias no críticas) antes de continuar.
+
+---
+
+## 📥 Instalación y configuración inicial
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/villegas07/agrosense.git
+cd agrosense
+
+# 2. Instalar dependencias
+flutter pub get
+
+# 3. (Opcional) Regenerar código generado por build_runner
+dart run build_runner build --delete-conflicting-outputs
+```
+
+---
+
+## 📱 Plataformas soportadas
+
+| Plataforma | Estado | Notas |
+|------------|--------|-------|
+| Android | ✅ Soportada | API 21+ (Android 5.0) |
+| iOS | ✅ Soportada | Requiere macOS + Xcode |
+| Web | ✅ Soportada | `flutter run -d chrome` |
+| Linux / Windows / macOS | ✅ Soportada | Desktop embedder habilitado |
+
+### Android
+Asegúrate de tener Android Studio con un emulador configurado o un dispositivo físico conectado en modo depuración USB.
+
+```bash
+flutter run -d android
+```
+
+### iOS (solo macOS)
+Requiere Xcode 14+ y CocoaPods instalado (`sudo gem install cocoapods`).
+
+```bash
+cd ios && pod install && cd ..
+flutter run -d ios
+```
+
+---
+
 ## 📁 Estructura del Proyecto
 
 ```
@@ -112,14 +168,20 @@ dashboardDataProvider (StreamProvider.family)   ← Pantalla lo consume
 ## 🚀 Cómo ejecutar
 
 ```bash
-# 1. Instalar dependencias
-flutter pub get
-
-# 2. Ejecutar
+# Ejecutar en el dispositivo/emulador por defecto
 flutter run
 
-# 3. (Opcional) Generar código con build_runner
-dart run build_runner build --delete-conflicting-outputs
+# Ejecutar en un dispositivo específico
+flutter run -d <device_id>
+
+# Listar dispositivos disponibles
+flutter devices
+
+# Compilar release APK (Android)
+flutter build apk --release
+
+# Compilar release para web
+flutter build web
 ```
 
 ---
@@ -155,3 +217,50 @@ final dashboardLocalDataSourceProvider =
 ```
 
 El resto de la arquitectura no necesita cambios. ✅
+
+---
+
+## 🛠️ Solución de problemas comunes
+
+**`flutter pub get` falla con errores de red**
+```bash
+# Usa el mirror de pub si estás en una red restringida
+export PUB_HOSTED_URL=https://pub.flutter-io.cn
+flutter pub get
+```
+
+**Error: `Dart SDK version is not compatible`**
+Actualiza Flutter a la versión mínima requerida:
+```bash
+flutter upgrade
+flutter --version   # debe mostrar Flutter >= 3.10.0 / Dart >= 3.0.0
+```
+
+**`flutter doctor` muestra errores en Android licenses**
+```bash
+flutter doctor --android-licenses
+# Acepta todas las licencias presionando 'y'
+```
+
+**Widgets no renderizan gráficas (`fl_chart`)**
+Asegúrate de que el widget tenga un tamaño concreto (height/width); `fl_chart` requiere constraints definidos.
+
+---
+
+## 🤝 Contribuir
+
+1. Haz fork del repositorio
+2. Crea una rama descriptiva: `git checkout -b feat/nombre-feature`
+3. Realiza tus cambios respetando la arquitectura Clean Architecture descrita arriba
+4. Ejecuta el análisis estático antes de hacer commit:
+   ```bash
+   flutter analyze
+   flutter test
+   ```
+5. Abre un Pull Request describiendo los cambios
+
+---
+
+## 📄 Licencia
+
+Este proyecto es de uso académico. Consulta al autor antes de cualquier uso comercial.
