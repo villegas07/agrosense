@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../providers/dashboard_providers.dart';
 import '../widgets/historical_analysis_card.dart';
 import '../widgets/last24_hours_card.dart';
@@ -14,8 +15,14 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sectorId = ref.watch(selectedSectorIdProvider);
-    final asyncData = ref.watch(dashboardDataProvider(sectorId));
+    final effectiveSectorId = ref.watch(effectiveSectorIdProvider);
+
+    // Mientras no haya sector disponible (carga inicial o error de API)
+    if (effectiveSectorId.isEmpty) {
+      return _SectorLoadingOrError(ref: ref);
+    }
+
+    final asyncData = ref.watch(dashboardDataProvider(effectiveSectorId));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -23,7 +30,8 @@ class DashboardScreen extends ConsumerWidget {
         loading: () => const _LoadingView(),
         error: (e, _) => _ErrorView(
           message: e.toString(),
-          onRetry: () => ref.invalidate(dashboardDataProvider(sectorId)),
+          onRetry: () =>
+              ref.invalidate(dashboardDataProvider(effectiveSectorId)),
         ),
         data: (data) => CustomScrollView(
           slivers: [
@@ -36,12 +44,14 @@ class DashboardScreen extends ConsumerWidget {
                   ? data.soilZones.first.humidityPercent
                   : 0,
               isRaining: data.rainState.isRaining,
+              onLogout: () => ref.read(authProvider.notifier).logout(),
             ),
             SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
+                  _SectorPicker(effectiveSectorId: effectiveSectorId),
                   TemperatureCard(temperature: data.temperature),
                   const _Divider(),
                   SoilHumidityCard(zones: data.soilZones),
@@ -69,6 +79,85 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
+// ── Sector Picker ─────────────────────────────────────────────────────────────
+class _SectorPicker extends ConsumerWidget {
+  const _SectorPicker({required this.effectiveSectorId});
+
+  final String effectiveSectorId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sectorsAsync = ref.watch(sectorsProvider);
+
+    return sectorsAsync.maybeWhen(
+      data: (sectors) {
+        // Only show picker when there are multiple sectors
+        if (sectors.length <= 1) return const SizedBox.shrink();
+        return SizedBox(
+          height: 40,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: sectors.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) {
+              final sector = sectors[i];
+              final selected = sector.sectorId == effectiveSectorId;
+              return ChoiceChip(
+                label: Text(sector.name),
+                selected: selected,
+                labelStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                      selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? Colors.white
+                      : AppColors.textSecondary,
+                ),
+                selectedColor: AppColors.primary,
+                backgroundColor: AppColors.surfaceVariant,
+                side: BorderSide.none,
+                onSelected: (_) => ref
+                    .read(selectedSectorIdProvider.notifier)
+                    .state = sector.sectorId,
+              );
+            },
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+// ── Sector loading / error (before first sector is known) ─────────────────────
+class _SectorLoadingOrError extends ConsumerWidget {
+  const _SectorLoadingOrError({required this.ref});
+
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context, WidgetRef widgetRef) {
+    final sectorsAsync = widgetRef.watch(sectorsProvider);
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: sectorsAsync.when(
+        loading: () => const _LoadingView(),
+        error: (e, _) => _ErrorView(
+          message: 'No se pudieron cargar los sectores.\n${e.toString()}',
+          onRetry: () => widgetRef.invalidate(sectorsProvider),
+        ),
+        // sectors loaded but empty list
+        data: (_) => _ErrorView(
+          message: 'No hay sectores configurados en el servidor.',
+          onRetry: () => widgetRef.invalidate(sectorsProvider),
+        ),
+      ),
+    );
+  }
+}
+
+// ── AppBar ────────────────────────────────────────────────────────────────────
 class _DashboardAppBar extends StatelessWidget {
   const _DashboardAppBar({
     required this.sectorName,
@@ -77,6 +166,7 @@ class _DashboardAppBar extends StatelessWidget {
     required this.ambientTemp,
     required this.soilHumidity,
     required this.isRaining,
+    required this.onLogout,
   });
 
   final String sectorName;
@@ -85,16 +175,16 @@ class _DashboardAppBar extends StatelessWidget {
   final double ambientTemp;
   final int soilHumidity;
   final bool isRaining;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
     final statusBarHeight = MediaQuery.of(context).padding.top;
-    // Posición dinámica del contenido: debajo del toolbar + barra de estado + margen.
     final contentTop = kToolbarHeight.toDouble() + statusBarHeight + 4.0;
 
     return SliverAppBar(
       pinned: true,
-      expandedHeight: contentTop + 80, // contentTop + contenido (~76) + margen
+      expandedHeight: contentTop + 80,
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -119,11 +209,16 @@ class _DashboardAppBar extends StatelessWidget {
         ),
       ),
       actions: [
+        IconButton(
+          icon: const Icon(Icons.logout_rounded,
+              size: 20, color: AppColors.textSecondary),
+          tooltip: 'Cerrar sesión',
+          onPressed: onLogout,
+        ),
         if (isLive)
           Container(
             margin: const EdgeInsets.only(right: 16, top: 13, bottom: 13),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: AppColors.liveRed,
               borderRadius: BorderRadius.circular(20),
@@ -279,8 +374,7 @@ class _LoadingView extends StatelessWidget {
           SizedBox(height: 16),
           Text(
             'Cargando datos del sensor...',
-            style:
-                TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
         ],
       ),

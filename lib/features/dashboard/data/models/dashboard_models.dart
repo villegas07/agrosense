@@ -69,4 +69,91 @@ class DashboardDataModel extends DashboardData {
     required super.monthlyRain,
     required super.heatmapData,
   });
+
+  factory DashboardDataModel.fromJson(Map<String, dynamic> json) =>
+      DashboardDataModel(
+        sectorName: json['sector_name'] as String,
+        lastUpdated: json['last_updated'] as String,
+        isLive: json['is_live'] as bool,
+        temperature: TemperatureReadingModel.fromJson(
+            json['temperature'] as Map<String, dynamic>),
+        soilZones: (json['soil_zones'] as List<dynamic>)
+            .map((e) => SoilZoneModel.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        rainState: RainStateModel.fromJson(
+            json['rain_state'] as Map<String, dynamic>),
+        last24Hours: (json['last_24_hours'] as List<dynamic>)
+            .map((e) => HourlyReadingModel.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        alertMessage: json['alert_message'] as String?,
+        weeklyRain: (json['weekly_rain'] as List<dynamic>)
+            .map((e) => DailyRainModel.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        monthlyRain: (json['monthly_rain'] as List<dynamic>)
+            .map((e) => DailyRainModel.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        heatmapData: (json['heatmap_data'] as List<dynamic>)
+            .map((e) => HeatmapCellModel.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class RainStateModel extends RainState {
+  const RainStateModel({
+    required super.isRaining,
+    required super.label,
+    required super.lastEventDescription,
+    required super.lastHours,
+    required super.lastMm,
+    required super.last7Days,
+    required super.last7DaysMm,
+    required super.last30Days,
+    required super.last30DaysMm,
+  });
+
+  factory RainStateModel.fromJson(Map<String, dynamic> json) => RainStateModel(
+        isRaining: json['is_raining'] as bool,
+        label: json['label'] as String,
+        lastEventDescription: json['last_event_description'] as String,
+        lastHours: (json['last_hours'] as num).toDouble(),
+        lastMm: (json['last_mm'] as num).toDouble(),
+        last7Days: (json['last_7_days'] as num).toDouble(),
+        last7DaysMm: (json['last_7_days_mm'] as num).toDouble(),
+        last30Days: (json['last_30_days'] as num).toDouble(),
+        last30DaysMm: (json['last_30_days_mm'] as num).toDouble(),
+      );
+}
+
+class HourlyReadingModel extends HourlyReading {
+  const HourlyReadingModel({
+    required super.time,
+    required super.ambientTemp,
+    required super.soilTemp,
+  });
+
+  factory HourlyReadingModel.fromJson(Map<String, dynamic> json) =>
+      HourlyReadingModel(
+        time: DateTime.parse(json['time'] as String),
+        ambientTemp: (json['ambient_temp'] as num?)?.toDouble() ?? 0.0,
+        soilTemp: (json['soil_temp'] as num?)?.toDouble() ?? 0.0,
+      );
+}
+
+class DailyRainModel extends DailyRain {
+  const DailyRainModel({required super.day, required super.mm});
+
+  factory DailyRainModel.fromJson(Map<String, dynamic> json) => DailyRainModel(
+        day: json['day'] as String,
+        mm: (json['mm'] as num).toDouble(),
+      );
+}
+
+class HeatmapCellModel extends HeatmapCell {
+  const HeatmapCellModel({required super.label, required super.value});
+
+  factory HeatmapCellModel.fromJson(Map<String, dynamic> json) =>
+      HeatmapCellModel(
+        label: json['label'] as String,
+        value: (json['value'] as num).toDouble(),
+      );
 }

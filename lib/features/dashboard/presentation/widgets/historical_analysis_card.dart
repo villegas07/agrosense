@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/dashboard_entities.dart';
 import 'section_header.dart';
@@ -27,7 +28,8 @@ class _HistoricalAnalysisCardState extends State<HistoricalAnalysisCard> {
       _showMonthly ? widget.monthlyRain : widget.weeklyRain;
 
   double get _maxY {
-    final max = _activeRain.map((r) => r.mm).fold(0.0, (a, b) => a > b ? a : b);
+    final max =
+        _activeRain.map((r) => r.mm).fold(0.0, (a, b) => a > b ? a : b);
     return (max * 1.3).ceilToDouble().clamp(10.0, double.infinity);
   }
 
@@ -49,7 +51,7 @@ class _HistoricalAnalysisCardState extends State<HistoricalAnalysisCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Bar chart
+              // ── Bar chart ─────────────────────────────────────────────────
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -108,9 +110,14 @@ class _HistoricalAnalysisCardState extends State<HistoricalAnalysisCard> {
                             bottomTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
+                                // For monthly view (30 items), show every 5th label
+                                interval: _showMonthly ? 5 : 1,
                                 getTitlesWidget: (v, m) {
                                   final i = v.toInt();
                                   if (i < 0 || i >= _activeRain.length) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  if (_showMonthly && i % 5 != 0) {
                                     return const SizedBox.shrink();
                                   }
                                   return Text(
@@ -134,7 +141,7 @@ class _HistoricalAnalysisCardState extends State<HistoricalAnalysisCard> {
                                     BarChartRodData(
                                       toY: e.value.mm,
                                       color: AppColors.chartBar,
-                                      width: 14,
+                                      width: _showMonthly ? 6 : 14,
                                       borderRadius: const BorderRadius.vertical(
                                         top: Radius.circular(4),
                                       ),
@@ -150,7 +157,7 @@ class _HistoricalAnalysisCardState extends State<HistoricalAnalysisCard> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Heatmap
+              // ── Heatmap ───────────────────────────────────────────────────
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -162,7 +169,7 @@ class _HistoricalAnalysisCardState extends State<HistoricalAnalysisCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Heatmap — Temp. Suelo',
+                      'Heatmap — Humedad de Suelo',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -191,10 +198,11 @@ class _HeatmapGrid extends StatelessWidget {
   final List<HeatmapCell> cells;
 
   Color _colorFor(double value) {
-    if (value < 24) return AppColors.heatLow;
-    if (value < 28) return AppColors.heatMid;
-    if (value < 30) return AppColors.warning;
-    return AppColors.heatHigh;
+    if (value <= 0) return AppColors.surfaceVariant;
+    if (value < AppConstants.dangerThreshold) return AppColors.danger;
+    if (value < AppConstants.optimalMin) return AppColors.warning;
+    if (value <= AppConstants.optimalMax) return AppColors.optimal;
+    return AppColors.chartBar; // excess moisture (>75%)
   }
 
   @override
@@ -202,39 +210,75 @@ class _HeatmapGrid extends StatelessWidget {
     const cols = 7;
     final rows = (cells.length / cols).ceil();
 
+    // Day headers from the labels of the first row of cells
+    final headers = cells.length >= cols
+        ? cells.sublist(0, cols).map((c) => c.label).toList()
+        : ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
     return Column(
-      children: List.generate(rows, (row) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(
-            children: List.generate(cols, (col) {
-              final i = row * cols + col;
-              if (i >= cells.length) return const Expanded(child: SizedBox());
-              final cell = cells[i];
-              final color = _colorFor(cell.value);
-              return Expanded(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${cell.value.toInt()}°',
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+      children: [
+        // Day-of-week header row
+        Row(
+          children: headers
+              .map(
+                (h) => Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Center(
+                      child: Text(
+                        h,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              );
-            }),
-          ),
-        );
-      }),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 4),
+        // Cell rows
+        ...List.generate(rows, (row) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: List.generate(cols, (col) {
+                final i = row * cols + col;
+                if (i >= cells.length) {
+                  return const Expanded(child: SizedBox());
+                }
+                final cell = cells[i];
+                final color = _colorFor(cell.value);
+                final textColor = cell.value <= 0
+                    ? AppColors.textTertiary
+                    : Colors.white;
+                return Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      cell.value <= 0 ? '-' : '${cell.value.toInt()}%',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          );
+        }),
+      ],
     );
   }
 }
@@ -244,16 +288,14 @@ class _HeatmapLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return const Wrap(
+      spacing: 10,
+      runSpacing: 4,
       children: [
-        _HeatmapLegendItem(color: AppColors.heatLow, label: '<24°'),
-        SizedBox(width: 8),
-        _HeatmapLegendItem(color: AppColors.heatMid, label: '24–28°'),
-        SizedBox(width: 8),
-        _HeatmapLegendItem(color: AppColors.warning, label: '28–30°'),
-        SizedBox(width: 8),
-        _HeatmapLegendItem(color: AppColors.heatHigh, label: '>30°'),
+        _HeatmapLegendItem(color: AppColors.danger, label: '<25% Riesgo'),
+        _HeatmapLegendItem(color: AppColors.warning, label: '25–40% Alerta'),
+        _HeatmapLegendItem(color: AppColors.optimal, label: '40–75% Óptimo'),
+        _HeatmapLegendItem(color: AppColors.chartBar, label: '>75% Exceso'),
       ],
     );
   }
@@ -268,6 +310,7 @@ class _HeatmapLegendItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 10,

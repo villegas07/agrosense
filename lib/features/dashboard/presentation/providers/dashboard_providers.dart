@@ -1,12 +1,36 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/network_providers.dart';
 import '../../data/datasources/dashboard_local_datasource.dart';
+import '../../data/datasources/dashboard_remote_datasource.dart';
+import '../../data/datasources/sector_remote_datasource.dart';
 import '../../data/repositories/dashboard_repository_impl.dart';
 import '../../domain/entities/dashboard_entities.dart';
+import '../../domain/entities/sector_entity.dart';
 import '../../domain/repositories/dashboard_repository.dart';
 import '../../domain/usecases/dashboard_usecases.dart';
 
-// ── Data Sources ─────────────────────────────────────────────────────────────
+// ── Sectors ───────────────────────────────────────────────────────────────────
+final sectorDataSourceProvider = Provider<SectorRemoteDataSource>((ref) {
+  return SectorRemoteDataSource(ref.watch(apiClientProvider).dio);
+});
+
+final sectorsProvider = FutureProvider<List<Sector>>((ref) {
+  return ref.watch(sectorDataSourceProvider).getSectors();
+});
+
+// ID del sector seleccionado por el usuario (vacío = usar el primero disponible)
+final selectedSectorIdProvider = StateProvider<String>((ref) => '');
+
+// Sector efectivo: usa la selección del usuario o el primero de la lista
+final effectiveSectorIdProvider = Provider<String>((ref) {
+  final selected = ref.watch(selectedSectorIdProvider);
+  if (selected.isNotEmpty) return selected;
+  final sectors = ref.watch(sectorsProvider);
+  return sectors.valueOrNull?.firstOrNull?.sectorId ?? '';
+});
+
+// ── Data Sources ──────────────────────────────────────────────────────────────
 final dashboardLocalDataSourceProvider =
     Provider<DashboardLocalDataSource>((ref) {
   final ds = DashboardLocalDataSourceImpl();
@@ -14,10 +38,15 @@ final dashboardLocalDataSourceProvider =
   return ds;
 });
 
-// ── Repositories ─────────────────────────────────────────────────────────────
+final dashboardRemoteDataSourceProvider =
+    Provider<DashboardLocalDataSource>((ref) {
+  return DashboardRemoteDataSourceImpl(ref.watch(apiClientProvider).dio);
+});
+
+// ── Repositories ──────────────────────────────────────────────────────────────
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   return DashboardRepositoryImpl(
-    ref.watch(dashboardLocalDataSourceProvider),
+    ref.watch(dashboardRemoteDataSourceProvider),
   );
 });
 
@@ -32,9 +61,7 @@ final watchDashboardDataUseCaseProvider =
   return WatchDashboardDataUseCase(ref.watch(dashboardRepositoryProvider));
 });
 
-// ── State ─────────────────────────────────────────────────────────────────────
-final selectedSectorIdProvider = StateProvider<String>((ref) => 'sector_3');
-
+// ── Dashboard Stream ──────────────────────────────────────────────────────────
 final dashboardDataProvider =
     StreamProvider.family<DashboardData, String>((ref, sectorId) {
   final useCase = ref.watch(watchDashboardDataUseCaseProvider);

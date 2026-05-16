@@ -14,20 +14,54 @@ class Last24HoursCard extends StatelessWidget {
   final List<HourlyReading> readings;
   final String? alertMessage;
 
+  // Only plot entries where we have actual data (API returns 0.0 for null hours)
   List<FlSpot> _ambientSpots() => readings
       .asMap()
       .entries
+      .where((e) => e.value.ambientTemp != 0.0)
       .map((e) => FlSpot(e.key.toDouble(), e.value.ambientTemp))
       .toList();
 
   List<FlSpot> _soilSpots() => readings
       .asMap()
       .entries
+      .where((e) => e.value.soilTemp != 0.0)
       .map((e) => FlSpot(e.key.toDouble(), e.value.soilTemp))
       .toList();
 
+  double _minY() {
+    final temps = readings.expand((r) => [
+          if (r.ambientTemp != 0.0) r.ambientTemp,
+          if (r.soilTemp != 0.0) r.soilTemp,
+        ]).toList();
+    if (temps.isEmpty) return 15.0;
+    final min = temps.reduce((a, b) => a < b ? a : b);
+    return (min - 2).floorToDouble();
+  }
+
+  double _maxY() {
+    final temps = readings.expand((r) => [
+          if (r.ambientTemp != 0.0) r.ambientTemp,
+          if (r.soilTemp != 0.0) r.soilTemp,
+        ]).toList();
+    if (temps.isEmpty) return 40.0;
+    final max = temps.reduce((a, b) => a > b ? a : b);
+    return (max + 2).ceilToDouble();
+  }
+
+  double _yInterval() {
+    final range = _maxY() - _minY();
+    if (range <= 8) return 2.0;
+    if (range <= 20) return 4.0;
+    return 5.0;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final minY = _minY();
+    final maxY = _maxY();
+    final interval = _yInterval();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -72,7 +106,7 @@ class Last24HoursCard extends StatelessWidget {
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: false,
-                        horizontalInterval: 2,
+                        horizontalInterval: interval,
                         getDrawingHorizontalLine: (value) => const FlLine(
                           color: AppColors.divider,
                           strokeWidth: 1,
@@ -83,7 +117,7 @@ class Last24HoursCard extends StatelessWidget {
                           sideTitles: SideTitles(
                             showTitles: true,
                             reservedSize: 28,
-                            interval: 4,
+                            interval: interval,
                             getTitlesWidget: (value, meta) => Text(
                               '${value.toInt()}°',
                               style: const TextStyle(
@@ -123,9 +157,9 @@ class Last24HoursCard extends StatelessWidget {
                       ),
                       borderData: FlBorderData(show: false),
                       minX: 0,
-                      maxX: 23,
-                      minY: 18,
-                      maxY: 34,
+                      maxX: readings.isEmpty ? 23 : (readings.length - 1).toDouble(),
+                      minY: minY,
+                      maxY: maxY,
                       lineBarsData: [
                         LineChartBarData(
                           spots: _ambientSpots(),
@@ -160,8 +194,8 @@ class Last24HoursCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border:
-                          Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
