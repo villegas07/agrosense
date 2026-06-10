@@ -6,6 +6,8 @@ import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/dashboard/presentation/screens/dashboard_screen.dart';
 
+final _navigatorKey = GlobalKey<NavigatorState>();
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: AgroSenseApp()));
@@ -16,19 +18,31 @@ class AgroSenseApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authAsync = ref.watch(authProvider);
+    ref.listen<AsyncValue<AuthStatus>>(authProvider, (prev, next) {
+      final prevStatus = prev?.valueOrNull;
+      final nextStatus = next.valueOrNull;
+
+      if (nextStatus == AuthStatus.authenticated &&
+          prevStatus != AuthStatus.authenticated) {
+        _navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          (_) => false,
+        );
+      } else if (nextStatus == AuthStatus.unauthenticated &&
+          prevStatus != AuthStatus.unauthenticated) {
+        _navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
+        );
+      }
+    });
 
     return MaterialApp(
       title: 'AgroSense',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: authAsync.when(
-        loading: () => const _SplashScreen(),
-        error: (_, __) => const LoginScreen(),
-        data: (status) => status == AuthStatus.authenticated
-            ? const DashboardScreen()
-            : const LoginScreen(),
-      ),
+      navigatorKey: _navigatorKey,
+      home: const _SplashScreen(),
     );
   }
 }
