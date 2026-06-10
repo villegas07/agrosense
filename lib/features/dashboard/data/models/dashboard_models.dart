@@ -34,6 +34,8 @@ class SoilZoneModel extends SoilZone {
     required super.depthLabel,
     required super.humidityPercent,
     required super.status,
+    super.tempAmb,
+    super.tempSuelo,
   });
 
   factory SoilZoneModel.fromJson(Map<String, dynamic> json) {
@@ -43,6 +45,8 @@ class SoilZoneModel extends SoilZone {
       depthLabel: json['depth_label'] as String,
       humidityPercent: pct,
       status: _statusFromPercent(pct),
+      tempAmb:   (json['temp_amb'] as num?)?.toDouble(),
+      tempSuelo: (json['temp_suelo'] as num?)?.toDouble(),
     );
   }
 
@@ -79,7 +83,8 @@ class DashboardDataModel extends DashboardData {
             json['temperature'] as Map<String, dynamic>),
         soilZones: (json['soil_zones'] as List<dynamic>)
             .map((e) => SoilZoneModel.fromJson(e as Map<String, dynamic>))
-            .toList(),
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name)),
         rainState: RainStateModel.fromJson(
             json['rain_state'] as Map<String, dynamic>),
         last24Hours: (json['last_24_hours'] as List<dynamic>)

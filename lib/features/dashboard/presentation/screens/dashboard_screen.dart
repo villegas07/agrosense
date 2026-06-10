@@ -6,15 +6,52 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../providers/dashboard_providers.dart';
 import '../widgets/historical_analysis_card.dart';
 import '../widgets/last24_hours_card.dart';
+import '../widgets/node_temperature_card.dart';
 import '../widgets/rain_state_card.dart';
 import '../widgets/soil_humidity_card.dart';
-import '../widgets/temperature_card.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  bool _isExporting = false;
+
+  Future<void> _handleExport(String sectorId) async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+    try {
+      final ds = ref.read(dashboardRemoteDataSourceProvider);
+      await ds.exportAndOpenSectorData(sectorId, hours: 168);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Archivo descargado exitosamente'),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al exportar: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final effectiveSectorId = ref.watch(effectiveSectorIdProvider);
 
     // Mientras no haya sector disponible (carga inicial o error de API)
@@ -45,6 +82,8 @@ class DashboardScreen extends ConsumerWidget {
                   : 0,
               isRaining: data.rainState.isRaining,
               onLogout: () => ref.read(authProvider.notifier).logout(),
+              onExport: () => _handleExport(effectiveSectorId),
+              isExporting: _isExporting,
             ),
             SliverToBoxAdapter(
               child: Column(
@@ -52,14 +91,14 @@ class DashboardScreen extends ConsumerWidget {
                 children: [
                   const SizedBox(height: 8),
                   _SectorPicker(effectiveSectorId: effectiveSectorId),
-                  TemperatureCard(temperature: data.temperature),
+                  NodeTemperatureCard(zones: data.soilZones),
                   const _Divider(),
                   SoilHumidityCard(zones: data.soilZones),
                   const _Divider(),
                   RainStateCard(rainState: data.rainState),
                   const _Divider(),
                   Last24HoursCard(
-                    readings: data.last24Hours,
+                    sectorId: effectiveSectorId,
                     alertMessage: data.alertMessage,
                   ),
                   const _Divider(),
@@ -167,6 +206,8 @@ class _DashboardAppBar extends StatelessWidget {
     required this.soilHumidity,
     required this.isRaining,
     required this.onLogout,
+    required this.onExport,
+    required this.isExporting,
   });
 
   final String sectorName;
@@ -176,6 +217,8 @@ class _DashboardAppBar extends StatelessWidget {
   final int soilHumidity;
   final bool isRaining;
   final VoidCallback onLogout;
+  final VoidCallback onExport;
+  final bool isExporting;
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +227,7 @@ class _DashboardAppBar extends StatelessWidget {
 
     return SliverAppBar(
       pinned: true,
-      expandedHeight: contentTop + 80,
+      expandedHeight: contentTop + 90,
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -209,6 +252,24 @@ class _DashboardAppBar extends StatelessWidget {
         ),
       ),
       actions: [
+        isExporting
+            ? const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              )
+            : IconButton(
+                icon: const Icon(Icons.download_rounded,
+                    size: 20, color: AppColors.textSecondary),
+                tooltip: 'Exportar a Excel (últimos 7 días)',
+                onPressed: onExport,
+              ),
         IconButton(
           icon: const Icon(Icons.logout_rounded,
               size: 20, color: AppColors.textSecondary),

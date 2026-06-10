@@ -6,6 +6,11 @@ import '../models/dashboard_models.dart';
 abstract class DashboardLocalDataSource {
   Future<DashboardData> getDashboardData(String sectorId);
   Stream<DashboardData> watchDashboardData(String sectorId);
+  Future<List<HourlyReading>> getTemperatureHistory(
+    String sectorId, {
+    int hours = 24,
+  });
+  Future<void> exportAndOpenSectorData(String sectorId, {int hours = 168});
   void dispose();
 }
 
@@ -144,6 +149,40 @@ class DashboardLocalDataSourceImpl implements DashboardLocalDataSource {
       final day = base.subtract(Duration(days: values.length - 1 - i));
       final label = '${day.day}/${day.month}';
       return DailyRain(day: label, mm: values[i]);
+    });
+  }
+
+  @override
+  Future<List<HourlyReading>> getTemperatureHistory(
+    String sectorId, {
+    int hours = 24,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 400));
+    return _buildExtendedReadings(hours);
+  }
+
+  @override
+  Future<void> exportAndOpenSectorData(String sectorId, {int hours = 168}) async {}
+
+  List<HourlyReading> _buildExtendedReadings(int hours) {
+    final now = DateTime.now();
+    const ambientPattern = [
+      24.0, 23.5, 23.0, 22.8, 22.5, 23.0, 24.5, 26.0,
+      27.5, 28.4, 29.0, 29.5, 30.0, 29.8, 29.2, 28.8,
+      28.4, 27.9, 27.2, 26.5, 26.0, 25.5, 25.0, 24.5,
+    ];
+    const soilPattern = [
+      21.0, 20.8, 20.6, 20.4, 20.2, 20.3, 20.8, 21.2,
+      21.6, 22.0, 22.1, 22.3, 22.5, 22.4, 22.3, 22.2,
+      22.1, 22.0, 21.8, 21.6, 21.4, 21.2, 21.0, 20.8,
+    ];
+    return List.generate(hours, (i) {
+      final t = now.subtract(Duration(hours: hours - 1 - i));
+      return HourlyReading(
+        time: t,
+        ambientTemp: ambientPattern[i % 24] + (i % 7) * 0.2,
+        soilTemp: soilPattern[i % 24] + (i % 5) * 0.1,
+      );
     });
   }
 

@@ -67,3 +67,16 @@ final dashboardDataProvider =
   final useCase = ref.watch(watchDashboardDataUseCaseProvider);
   return useCase(sectorId);
 });
+
+// ── Temperature History ───────────────────────────────────────────────────────
+final temperatureHistoryProvider = FutureProvider.family<
+    List<HourlyReading>,
+    ({String sectorId, TemperatureFilter filter})>((ref, args) {
+  final hours = switch (args.filter) {
+    TemperatureFilter.hours => 24,
+    TemperatureFilter.days => 168,
+    TemperatureFilter.week => 672,
+  };
+  final ds = ref.watch(dashboardRemoteDataSourceProvider);
+  return ds.getTemperatureHistory(args.sectorId, hours: hours);
+});

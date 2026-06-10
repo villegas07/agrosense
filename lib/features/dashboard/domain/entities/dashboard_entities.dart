@@ -28,15 +28,19 @@ class SoilZone extends Equatable {
     required this.depthLabel,
     required this.humidityPercent,
     required this.status,
+    this.tempAmb,
+    this.tempSuelo,
   });
 
   final String name;
   final String depthLabel;
   final int humidityPercent;
   final SoilHumidityStatus status;
+  final double? tempAmb;
+  final double? tempSuelo;
 
   @override
-  List<Object?> get props => [name, depthLabel, humidityPercent, status];
+  List<Object?> get props => [name, depthLabel, humidityPercent, status, tempAmb, tempSuelo];
 }
 
 // ── Rain State ───────────────────────────────────────────────────────────────
@@ -114,6 +118,9 @@ class HeatmapCell extends Equatable {
   @override
   List<Object?> get props => [label, value];
 }
+
+// ── Temperature Filter ───────────────────────────────────────────────────────
+enum TemperatureFilter { hours, days, week }
 
 // ── Dashboard Aggregate ──────────────────────────────────────────────────────
 class DashboardData extends Equatable {
